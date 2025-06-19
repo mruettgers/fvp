@@ -59,7 +59,7 @@ public:
     flTex->player = this;
 
     if (!fl_texture_registrar_register_texture(texReg, FL_TEXTURE(flTex))) {
-      clog << "fl_texture_registrar_register_texture error" << endl;
+      cout << "fl_texture_registrar_register_texture error" << endl;
       return;
     }
     textureId = fl_texture_get_id(FL_TEXTURE(flTex)); // MUST be after fl_texture_registrar_register_texture(), id is set there
@@ -74,7 +74,7 @@ public:
 
   ~TexturePlayer() override {
     if (!fl_texture_registrar_unregister_texture(texReg, FL_TEXTURE(flTex))) {
-      clog << "fl_texture_registrar_unregister_texture error" << endl;
+      cout << "fl_texture_registrar_unregister_texture error" << endl;
     }
     setRenderCallback(nullptr);
     setVideoSurfaceSize(-1, -1);
@@ -94,14 +94,14 @@ static void try_to_cleanup_gl_res(PlayerTexture* self)
 {
   if (gDelayCleanup.empty())
     return;
-  clog << gDelayCleanup.size() << " delayed cleanup contexts in this thread " << this_thread::get_id() << ", current gl context: " << self->ctx << endl;
+  cout << gDelayCleanup.size() << " delayed cleanup contexts in this thread " << this_thread::get_id() << ", current gl context: " << self->ctx << endl;
   for (auto i : gDelayCleanup) {
-    clog << "delayed cleanup context: " << i.first << endl;
+    cout << "delayed cleanup context: " << i.first << endl;
   }
   for (auto ctx : {self->ctx, (GdkGLContext*)nullptr}) { // nullptr: null context. assume rendering context never changes, so cleanup here
     if (auto it = gDelayCleanup.find(ctx); it != gDelayCleanup.cend()) {
       if (!it->second.empty())
-        clog << it->second.size() << " executing delayed tasks for context: " << ctx << endl;
+        cout << it->second.size() << " executing delayed tasks for context: " << ctx << endl;
       for (auto& task : it->second) {
         task();
       }
@@ -118,7 +118,7 @@ static gboolean player_texture_populate(FlTextureGL *texture, uint32_t *target, 
   if (self->fbo == 0) {
     self->ctx = gdk_gl_context_get_current(); // fbo can not be shared
     glGenFramebuffers(1, &self->fbo);
-    clog << "created fbo " + std::to_string(self->fbo) << endl;
+    cout << "created fbo " + std::to_string(self->fbo) << endl;
     try_to_cleanup_gl_res(self);
   }
   if (self->texture_id == 0) {
@@ -133,7 +133,7 @@ static gboolean player_texture_populate(FlTextureGL *texture, uint32_t *target, 
     glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
     if (err != GL_FRAMEBUFFER_COMPLETE) {
         //glDeleteFramebuffers(1, &fbo);
-        clog << "glFramebufferTexture2D error" << endl;
+        cout << "glFramebufferTexture2D error" << endl;
         return FALSE;
     }
     mdk::GLRenderAPI ra{};
@@ -155,14 +155,14 @@ static void player_texture_dispose(GObject* obj) {
   G_OBJECT_CLASS(player_texture_parent_class)->dispose(obj);
   auto self = PLAYER_TEXTURE(obj);
   if (!self->texture_id && !self->fbo) {
-    clog << "texture and fbo are not created yet" << endl;
+    cout << "texture and fbo are not created yet" << endl;
     return;
   }
   static const auto env = std::getenv("FVP_GL_CLEANUP_DELAY");
   static const bool kDelayCleanup = env && std::atoi(env);
   auto ctx = gdk_gl_context_get_current();
   if (self->ctx != ctx) {
-    clog << "gdk gl context change: " << self->ctx << " => " << ctx << endl;
+    cout << "gdk gl context change: " << self->ctx << " => " << ctx << endl;
     if (self->ctx && !kDelayCleanup) // null: dispose w/o populate. why?
       gdk_gl_context_make_current(self->ctx);
   }
@@ -174,11 +174,11 @@ static void player_texture_dispose(GObject* obj) {
   if (self->ctx == newCtx && newCtx) {
     cleanup();
   } else {
-    clog << self->ctx << " self->ctx is gl context: " << GDK_IS_GL_CONTEXT(self->ctx) << endl;
+    cout << self->ctx << " self->ctx is gl context: " << GDK_IS_GL_CONTEXT(self->ctx) << endl;
     // delay cleanup until the context is back
     gDelayCleanup[self->ctx].push_back(std::move(cleanup));
-    clog << (kDelayCleanup ? "force " : "") << "delay cleanup. dispose w/o a correct gl context: " << ctx << " => " << newCtx << " / " << self->ctx << endl;
-    clog << gDelayCleanup[self->ctx].size() << " context delayed cleanup for this thread " << this_thread::get_id() << endl;
+    cout << (kDelayCleanup ? "force " : "") << "delay cleanup. dispose w/o a correct gl context: " << ctx << " => " << newCtx << " / " << self->ctx << endl;
+    cout << gDelayCleanup[self->ctx].size() << " context delayed cleanup for this thread " << this_thread::get_id() << endl;
   }
   if (ctx && ctx != newCtx) // make current was called
     gdk_gl_context_make_current(ctx);
